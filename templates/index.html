@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Yemek Tanıma Sistemi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="container">
+        <h1>Yemek Tanıma Sistemi</h1>
+        <div class="content-wrapper">
+            <div class="camera-feed">
+                <img src="{{ url_for('video') }}" alt="Canlı Kamera">
+            </div>
+            <div class="info-panel">
+                <div class="info-item">
+                    <h3>Garson Bilgisi</h3>
+                    <p class="waiter-info" id="waiter-info">Garson henüz atanmadı</p>
+                </div>
+                <div class="info-item">
+                    <h3>Aktif Siparişler</h3>
+                    <div class="orders-list" id="orders-list">
+                        <!-- Siparişler buraya dinamik olarak eklenecek -->
+                    </div>
+                </div>
+                <div class="info-item">
+                    <h3>Anlık Toplam</h3>
+                    <p class="total-price" id="total-price">0₺</p>
+                </div>
+                <div class="info-item reset-info" id="reset-info-container" style="display: none;">
+                    <div class="reset-content">
+                        <p class="reset-message" id="reset-message">Masa sıfırlandı!</p>
+                        <p class="final-total" id="final-total"></p>
+                        <button id="reset-button" onclick="resetSystem()" class="reset-button">Sistem Durumunu Sıfırla</button>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <h3>Garson Performansı</h3>
+                    <p class="performance-score" id="performance-score">Performans: 0</p>
+                </div>
+                <div class="info-item">
+                    <h3>QR Sayaç</h3>
+                    <p class="qr-timer" id="qr-timer">Süre: 60 sn</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let updateTimeout;
+        let countdown = 60;
+        let qrTimerInterval;
+
+        function startQrCountdown() {
+            clearInterval(qrTimerInterval);
+            countdown = 60;
+            updateQrTimer();
+
+            qrTimerInterval = setInterval(() => {
+                countdown--;
+                updateQrTimer();
+
+                if (countdown <= 0) {
+                    clearInterval(qrTimerInterval);
+                }
+            }, 1000);
+        }
+
+        function updateQrTimer() {
+            const timerElement = document.getElementById('qr-timer');
+            if (timerElement) {
+                timerElement.textContent = `Süre: ${countdown} sn`;
+            }
+        }
+
+        function updateInfo() {
+            fetch('/get_info')
+                .then(response => response.json())
+                .then(data => {
+                    // Garson bilgisi güncelleme
+                    const waiterInfo = document.getElementById('waiter-info');
+                    if (data.waiter && data.waiter === "Fazliddin") {
+                        waiterInfo.textContent = `Garson atandı: Fazliddin`;
+                        waiterInfo.style.color = '#27ae60';
+
+                        // Sayaç sıfırla
+                        startQrCountdown();
+                    } else {
+                        waiterInfo.textContent = 'Garson henüz atanmadı';
+                        waiterInfo.style.color = '#666';
+                    }
+
+                    // Siparişleri güncelle
+                    const ordersList = document.getElementById('orders-list');
+                    if (data.orders && data.orders.length > 0) {
+                        ordersList.innerHTML = '';
+                        data.orders.forEach(order => {
+                            const orderItem = document.createElement('div');
+                            orderItem.className = 'order-item';
+                            orderItem.innerHTML = `
+                                <span>${order.item}</span>
+                                <span>${order.price}₺</span>
+                            `;
+                            ordersList.appendChild(orderItem);
+                        });
+                    }
+
+                    // Toplam fiyatı güncelle
+                    document.getElementById('total-price').textContent = `${data.total}₺`;
+
+                    // Reset durumu kontrolü
+                    const resetContainer = document.getElementById('reset-info-container');
+                    const finalTotal = document.getElementById('final-total');
+
+                    if (data.reset) {
+                        resetContainer.style.display = 'block';
+                        finalTotal.textContent = `Ödenmesi Gereken Tutar: ${data.total}₺`;
+                        ordersList.innerHTML = '';
+                        document.getElementById('total-price').textContent = '0₺';
+                    }
+
+                    // Performans puanı güncelle
+                  const perf = document.getElementById('performance-score');
+                  perf.textContent = `Performans: ${data.performance}`;
+
+
+                })
+                .catch(error => console.error('Hata:', error))
+                .finally(() => {
+                    clearTimeout(updateTimeout);
+                    updateTimeout = setTimeout(updateInfo, 500);
+                });
+        }
+
+        function resetSystem() {
+            fetch('/reset_system', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload(); // Sayfayı yenile
+                }
+            })
+            .catch(error => console.error('Hata:', error));
+        }
+
+        // Sayfa yüklendiğinde başlat
+        document.addEventListener('DOMContentLoaded', () => {
+            updateInfo();
+            startQrCountdown(); // İlk sayaç başlangıcı
+        });
+    </script>
+</body>
+</html>
