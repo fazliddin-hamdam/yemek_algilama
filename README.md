@@ -73,5 +73,3 @@ Masa sıfırlamak için kırmızı renk gösterilmelidir.
 
 clean_db.py ile sistem manuel olarak da sıfırlanabilir.
 
-Geliştirici
-    Fazliddin Hamdam
